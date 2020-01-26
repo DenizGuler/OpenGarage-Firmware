@@ -683,9 +683,10 @@ void do_setup()
   curr_cloud_access_en = og.get_cloud_access_en();
   curr_mode = og.get_mode();
   if(!otf) {
-    if(og.options[OPTION_AUTH].sval) {
+    const String otfDeviceKey = og.options[OPTION_AUTH].sval;
+    if(og.options[OPTION_AUTH].sval && otfDeviceKey.length() > 0) {
       // Initialize with remote connection if a device key was specified.
-      otf = new OTF::OpenThingsFramework(og.options[OPTION_HTP].ival, og.options[OPTION_BDMN].sval, og.options[OPTION_BPRT].ival, og.options[OPTION_AUTH].sval);
+      otf = new OTF::OpenThingsFramework(og.options[OPTION_HTP].ival, og.options[OPTION_BDMN].sval, og.options[OPTION_BPRT].ival, otfDeviceKey);
       DEBUG_PRINT(F("Starting OTF with remote connection"));
     } else {
       // Initialize just the local server if no device key was specified.
