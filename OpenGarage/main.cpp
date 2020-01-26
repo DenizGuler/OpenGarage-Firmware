@@ -65,7 +65,7 @@ static HTTPClient http;
 
 void do_setup();
 
-void otf_send_html_P(const __FlashStringHelper *content, OTF::Response &res) {
+void otf_send_html_P(OTF::Response &res, const __FlashStringHelper *content) {
   res.writeStatus(200, "OK");
   res.writeHeader(F("content-type"), F("text/html"));
   res.writeBodyChunk((char *) "%s", content);
@@ -73,14 +73,14 @@ void otf_send_html_P(const __FlashStringHelper *content, OTF::Response &res) {
   DEBUG_PRINTLN(F(" bytes sent."));
 }
 
-void otf_send_json(String json, OTF::Response &res) {
+void otf_send_json(OTF::Response &res, String json) {
   res.writeStatus(200, "OK");
   res.writeHeader(F("content-type"), F("application/json"));
   res.writeHeader(F("access-control-allow-origin"), (char *) "*"); // from esp8266 2.4 this has to be sent explicitly
   res.writeBodyChunk((char *) "%s",json.c_str());
 }
 
-void otf_send_result(byte code, OTF::Response &res, const char* item = NULL) {
+void otf_send_result(OTF::Response &res, byte code, const char *item = NULL) {
   String json = F("{\"result\":");
   json += code;
   if (!item) item = "";
@@ -88,7 +88,7 @@ void otf_send_result(byte code, OTF::Response &res, const char* item = NULL) {
   json += item;
   json += F("\"");
   json += F("}");
-  otf_send_json(json, res);
+  otf_send_json(res, json);
 }
 
 void updateserver_send_result(byte code, const char* item = NULL) {
@@ -154,18 +154,18 @@ void restart_in(uint32_t ms) {
 void on_home(const OTF::Request &req, OTF::Response &res)
 {
   if(curr_mode == OG_MOD_AP) {
-    otf_send_html_P((const __FlashStringHelper *) ap_home_html, res);
+    otf_send_html_P(res, (const __FlashStringHelper *) ap_home_html);
   } else {
-    otf_send_html_P((const __FlashStringHelper *) sta_home_html, res);
+    otf_send_html_P(res, (const __FlashStringHelper *) sta_home_html);
   }
 }
 
 void on_sta_view_options(const OTF::Request &req, OTF::Response &res) {
-  otf_send_html_P((const __FlashStringHelper *) sta_options_html, res);
+  otf_send_html_P(res, (const __FlashStringHelper *) sta_options_html);
 }
 
 void on_sta_view_logs(const OTF::Request &req, OTF::Response &res) {
-  otf_send_html_P((const __FlashStringHelper *) sta_logs_html, res);
+  otf_send_html_P(res, (const __FlashStringHelper *) sta_logs_html);
 }
 
 char dec2hexchar(byte dec) {
@@ -248,7 +248,7 @@ void on_sta_controller(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
   String json;
   sta_controller_fill_json(json);
-  otf_send_json(json, res);
+  otf_send_json(res, json);
 }
 
 void on_sta_debug(const OTF::Request &req, OTF::Response &res) {
@@ -273,7 +273,7 @@ void on_sta_debug(const OTF::Request &req, OTF::Response &res) {
   json += F("\",\"Freeheap\":");
   json += (uint16_t)ESP.getFreeHeap();
   json += F("}");
-  otf_send_json(json, res);
+  otf_send_json(res, json);
 }
 
 void sta_logs_fill_json(String& json, OTF::Response &res) {
@@ -285,7 +285,7 @@ void sta_logs_fill_json(String& json, OTF::Response &res) {
   json += F(",\"logs\":[");
   if(!og.read_log_start()) {
     json += F("]}");
-    otf_send_json(json, res);
+    otf_send_json(res, json);
     return;
   }
   LogStruct l;
@@ -309,7 +309,7 @@ void on_sta_logs(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
   String json;
   sta_logs_fill_json(json, res);
-  otf_send_json(json, res);
+  otf_send_json(res, json);
 }
 
 bool verify_device_key(const OTF::Request &req) {
@@ -321,28 +321,28 @@ bool verify_device_key(const OTF::Request &req) {
 
 void on_reset_all(const OTF::Request &req, OTF::Response &res){
   if(!verify_device_key(req)) {
-    otf_send_result(HTML_UNAUTHORIZED, res);
+    otf_send_result(res, HTML_UNAUTHORIZED, nullptr);
     return;
   }
 
   og.state = OG_STATE_RESET;
-  return otf_send_result(HTML_SUCCESS, res);
+  return otf_send_result(res, HTML_SUCCESS, nullptr);
 }
 
 void on_clear_log(const OTF::Request &req, OTF::Response &res) {
   if(!verify_device_key(req)) {
-    otf_send_result(HTML_UNAUTHORIZED, res);
+    otf_send_result(res, HTML_UNAUTHORIZED, nullptr);
     return;
   }
   og.log_reset();
-  otf_send_result(HTML_SUCCESS, res);
+  otf_send_result(res, HTML_SUCCESS, nullptr);
 }
 
 void sta_change_controller_main(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
 
   if(!verify_device_key(req)) {
-    otf_send_result(HTML_UNAUTHORIZED, res);
+    otf_send_result(res, HTML_UNAUTHORIZED, nullptr);
     return;
   }
 
@@ -352,7 +352,7 @@ void sta_change_controller_main(const OTF::Request &req, OTF::Response &res) {
 
   if(click || close || open) {
     DEBUG_PRINTLN(F("Received button request (click, close, or open)"));
-    otf_send_result(HTML_SUCCESS, res);
+    otf_send_result(res, HTML_SUCCESS, nullptr);
     //1 is open
     if ((close && door_status) ||
         (open && !door_status) ||
@@ -369,14 +369,14 @@ void sta_change_controller_main(const OTF::Request &req, OTF::Response &res) {
       DEBUG_PRINTLN(F("Command request not valid, door already in requested state"));
     }
   } else if(req.getQueryParameter("reboot") != NULL) {
-    otf_send_result(HTML_SUCCESS, res);
+    otf_send_result(res, HTML_SUCCESS, nullptr);
     //restart_ticker.once_ms(1000, og.restart);
     restart_in(1000);
   } else if(req.getQueryParameter("apmode") != NULL) {
-    otf_send_result(HTML_SUCCESS, res);
+    otf_send_result(res, HTML_SUCCESS, nullptr);
     og.reset_to_ap();
   } else {
-    return otf_send_result(HTML_NOT_PERMITTED, res);
+    return otf_send_result(res, HTML_NOT_PERMITTED, nullptr);
   }
 
 }
@@ -389,7 +389,7 @@ void sta_change_options_main(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
 
   if(!verify_device_key(req)) {
-    otf_send_result(HTML_UNAUTHORIZED, res);
+    otf_send_result(res, HTML_UNAUTHORIZED, nullptr);
     return;
   }
 
@@ -411,22 +411,22 @@ void sta_change_options_main(const OTF::Request &req, OTF::Response &res) {
       if(sval != NULL) {
         uint ival = String(sval).toInt();
         if(ival>o->max) {	// check max limit
-          otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
+          otf_send_result(res, HTML_DATA_OUTOFBOUND, key);
           return;
         }
         // check min limit
         if(i==OPTION_DRI && ival < 50) {
-        	otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
+          otf_send_result(res, HTML_DATA_OUTOFBOUND, key);
         	return;
         }
         if(i==OPTION_LSZ && ival < 20) {
           // minimal log size is 20
-          otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
+          otf_send_result(res, HTML_DATA_OUTOFBOUND, key);
           return;
         }
         if(i==OPTION_CDT && ival < 50) {
           // click delay time should be at least 50 ms
-          otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
+          otf_send_result(res, HTML_DATA_OUTOFBOUND, key);
           return;
         }
         if(i==OPTION_USI && ival==1) {
@@ -451,20 +451,20 @@ void sta_change_options_main(const OTF::Request &req, OTF::Response &res) {
       if(gwip != NULL) {
         // check validity of IP address
         IPAddress ip;
-        if(!ip.fromString(dvip)) {otf_send_result(HTML_DATA_FORMATERROR, res, _dvip); return;}
-        if(!ip.fromString(gwip)) {otf_send_result(HTML_DATA_FORMATERROR, res, _gwip); return;}
+        if(!ip.fromString(dvip)) { otf_send_result(res, HTML_DATA_FORMATERROR, _dvip); return;}
+        if(!ip.fromString(gwip)) { otf_send_result(res, HTML_DATA_FORMATERROR, _gwip); return;}
         if(subn != NULL) {
           if(!ip.fromString(subn)) {
-            otf_send_result(HTML_DATA_FORMATERROR, res, _subn);
+            otf_send_result(res, HTML_DATA_FORMATERROR, _subn);
             return;
           }
         }
       } else {
-        otf_send_result(HTML_DATA_MISSING, res, _gwip);
+        otf_send_result(res, HTML_DATA_MISSING, _gwip);
         return;
       }              
     } else {
-      otf_send_result(HTML_DATA_MISSING, res, _dvip);
+      otf_send_result(res, HTML_DATA_MISSING, _dvip);
       return;
     }
   }
@@ -478,11 +478,11 @@ void sta_change_options_main(const OTF::Request &req, OTF::Response &res) {
   if(nkey != NULL) {
     if(ckey != NULL) {
       if(!nkey.equals(ckey)) {
-        otf_send_result(HTML_MISMATCH, res, _ckey);
+        otf_send_result(res, HTML_MISMATCH, _ckey);
         return;
       }
     } else {
-      otf_send_result(HTML_DATA_MISSING, res, _ckey);
+      otf_send_result(res, HTML_DATA_MISSING, _ckey);
       return;
     }
   }
@@ -520,7 +520,7 @@ void sta_change_options_main(const OTF::Request &req, OTF::Response &res) {
   }
 
   og.options_save();
-  otf_send_result(HTML_SUCCESS, res);
+  otf_send_result(res, HTML_SUCCESS, nullptr);
 }
 
 void on_sta_change_options(const OTF::Request &req, OTF::Response &res) {
@@ -559,12 +559,12 @@ void on_sta_options(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
   String json;
   sta_options_fill_json(json);
-  otf_send_json(json, res);
+  otf_send_json(res, json);
 }
 
 void on_ap_scan(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_STA) return;
-  otf_send_json(scanned_ssids, res);
+  otf_send_json(res, scanned_ssids);
 }
 
 void on_ap_change_config(const OTF::Request &req, OTF::Response &res) {
@@ -578,11 +578,11 @@ void on_ap_change_config(const OTF::Request &req, OTF::Response &res) {
     if(auth!=NULL&&strlen(auth)!=0)
       og.options[OPTION_AUTH].sval = auth;
     og.options_save();
-    otf_send_result(HTML_SUCCESS, res);
+    otf_send_result(res, HTML_SUCCESS, nullptr);
     og.state = OG_STATE_TRY_CONNECT;
 
   } else {
-    otf_send_result(HTML_DATA_MISSING, res, "ssid");
+    otf_send_result(res, HTML_DATA_MISSING, "ssid");
   }
 }
 
@@ -592,7 +592,7 @@ void on_ap_try_connect(const OTF::Request &req, OTF::Response &res) {
   json += F("\"ip\":");
   json += (WiFi.status() == WL_CONNECTED) ? (uint32_t)WiFi.localIP() : 0;
   json += F("}");
-  otf_send_json(json, res);
+  otf_send_json(res, json);
   if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
     /*DEBUG_PRINTLN(F("STA connected, updating option file"));
     og.options[OPTION_MOD].ival = OG_MOD_STA;
@@ -614,7 +614,7 @@ void on_ap_debug(const OTF::Request &req, OTF::Response &res) {
   json += F(",\"fwv\":");
   json += og.options[OPTION_FWV].ival;
   json += F("}");
-  otf_send_json(json, res);
+  otf_send_json(res, json);
 }
 
 // MQTT callback to read "Button" requests
@@ -771,11 +771,11 @@ byte check_door_status_hist() {
 }
 
 void on_sta_update(const OTF::Request &req, OTF::Response &res) {
-  otf_send_html_P((const __FlashStringHelper *) sta_update_html, res);
+  otf_send_html_P(res, (const __FlashStringHelper *) sta_update_html);
 }
 
 void on_ap_update(const OTF::Request &req, OTF::Response &res) {
-  otf_send_html_P((const __FlashStringHelper *) ap_update_html, res);
+  otf_send_html_P(res, (const __FlashStringHelper *) ap_update_html);
 }
 
 void on_sta_upload_fin() {
