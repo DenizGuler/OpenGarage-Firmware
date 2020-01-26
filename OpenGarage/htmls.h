@@ -122,7 +122,7 @@ show_msg('Update failed.',0,'red');
 }
 }
 };
-xhr.open('POST', 'update', true);
+xhr.open('POST', '//' + window.location.hostname + ':8080' + window.location.pathname, true);
 xhr.send(fd);
 });
 </script>
@@ -593,11 +593,8 @@ show_msg('Update failed.',0,'red');
 }
 }
 };
-xhr.open('POST', 'update', true);
+xhr.open('POST', '//' + window.location.hostname + ':8080' + window.location.pathname, true);
 xhr.send(fd);
-});
-document.addEventListener('DOMContentLoaded', function() {
-document.getElementById('fm').action = '//' + window.location.hostname + ':8080' + window.location.pathname;
 });
 </script>
 </body>

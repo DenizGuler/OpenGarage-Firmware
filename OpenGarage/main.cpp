@@ -1235,6 +1235,7 @@ void do_loop() {
       updateServer->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
       otf->on("/resetall",on_reset_all);
       otf->onMissingPage(on_home);
+      updateServer->begin();
       DEBUG_PRINTLN(F("Web Server endpoints (AP mode) registered"));
       og.state = OG_STATE_CONNECTED;
       DEBUG_PRINTLN(WiFi.softAPIP());
@@ -1282,6 +1283,7 @@ void do_loop() {
       updateServer->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
       otf->on("/clearlog", on_clear_log);
       otf->on("/resetall",on_reset_all);
+      updateServer->begin();
       DEBUG_PRINTLN(F("Web Server endpoints (STA mode) registered"));
 
       if(og.options[OPTION_MQTT].sval.length()>8) {
