@@ -687,11 +687,11 @@ void do_setup()
     if(og.options[OPTION_AUTH].sval && otfDeviceKey.length() > 0) {
       // Initialize with remote connection if a device key was specified.
       otf = new OTF::OpenThingsFramework(og.options[OPTION_HTP].ival, og.options[OPTION_BDMN].sval, og.options[OPTION_BPRT].ival, otfDeviceKey);
-      DEBUG_PRINT(F("Starting OTF with remote connection"));
+      DEBUG_PRINTLN(F("Started OTF with remote connection"));
     } else {
       // Initialize just the local server if no device key was specified.
       otf = new OTF::OpenThingsFramework(og.options[OPTION_HTP].ival);
-      DEBUG_PRINT(F("Starting OTF with just local connection"));
+      DEBUG_PRINTLN(F("Started OTF with just local connection"));
     }
     if(curr_mode == OG_MOD_AP) dns = new DNSServer();
     DEBUG_PRINT(F("server started @ "));
