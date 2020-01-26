@@ -6,12 +6,12 @@ $(ESP_LIBS)/DNSServer \
 $(ESP_LIBS)/ESP8266WebServer \
 $(ESP_LIBS)/ESP8266HTTPClient \
 $(ESP_LIBS)/Ticker \
-~/Arduino/libraries/Blynk \
 ~/Arduino/libraries/pubsubclient \
 ~/Arduino/libraries/AM2320 \
 ~/Arduino/libraries/OneWire \
 ~/Arduino/libraries/DHTsensor \
 ~/Arduino/libraries/DallasTemperature \
+~/Arduino/libraries/OTF-Controller-Library \
 .
 
 ESP_ROOT = $(HOME)/esp8266_2.4/

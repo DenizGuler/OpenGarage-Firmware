@@ -20,27 +20,23 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#if defined(SERIAL_DEBUG)
-  #define BLYNK_DEBUG
-  #define BLYNK_PRINT Serial
-#endif
-
-#include <BlynkSimpleEsp8266.h>
+#include <ESP8266WebServer.h>
+#include <cstring>
 #include <DNSServer.h>
 #include <PubSubClient.h> //https://github.com/Imroy/pubsubclient
+#include <OpenThingsFramework.h>
+#include <Request.h>
+#include <Response.h>
 
 #include "pitches.h"
 #include "OpenGarage.h"
 #include "espconnect.h"
 
 OpenGarage og;
-ESP8266WebServer *server = NULL;
+OTF::OpenThingsFramework *otf = NULL;
+ESP8266WebServer *updateServer = NULL;
 DNSServer *dns = NULL;
 
-WidgetLED blynk_door(BLYNK_PIN_DOOR);
-WidgetLED blynk_car(BLYNK_PIN_CAR);
-
-static Ticker led_ticker;
 static Ticker aux_ticker;
 static Ticker ip_ticker;
 static Ticker restart_ticker;
@@ -69,58 +65,22 @@ static HTTPClient http;
 
 void do_setup();
 
-byte findKeyVal (const char *str, const char *key, char *strbuf=NULL, uint8_t maxlen=0) {
-  uint8_t found=0;
-  uint8_t i=0;
-  const char *kp;
-  kp=key;
-  while(*str &&  *str!=' ' && *str!='\n' && found==0){
-    if (*str == *kp){
-      kp++;
-      if (*kp == '\0'){
-        str++;
-        kp=key;
-        if (*str == '='){
-            found=1;
-        }
-      }
-    } else {
-      kp=key;
-    }
-    str++;
-  }
-  if(strbuf==NULL) return found; // if output buffer not provided, return right away
-
-  if (found==1){
-    // copy the value to a buffer and terminate it with '\0'
-    while(*str &&  *str!=' ' && *str!='\n' && *str!='&' && i<maxlen-1){
-      *strbuf=*str;
-      i++;
-      str++;
-      strbuf++;
-    }
-    if (!(*str) ||  *str == ' ' || *str == '\n' || *str == '&') {
-      *strbuf = '\0';
-    } else {
-      found = 0;  // Ignore partial values i.e. value length is larger than maxlen
-      i = 0;
-    }
-  }
-  return(i); // return the length of the value
-}
-
-void server_send_html_P(PGM_P content) {
-  server->send_P(200, PSTR("text/html"), content);
-  DEBUG_PRINT(strlen_P(content));
+void otf_send_html_P(const __FlashStringHelper *content, OTF::Response &res) {
+  res.writeStatus(200, "OK");
+  res.writeHeader(F("content-type"), F("text/html"));
+  res.writeBodyChunk((char *) "%s", content);
+  DEBUG_PRINT(strlen_P((char *) content));
   DEBUG_PRINTLN(F(" bytes sent."));
 }
 
-void server_send_json(String json) {
-  server->sendHeader("Access-Control-Allow-Origin", "*"); // from esp8266 2.4 this has to be sent explicitly
-  server->send(200, "application/json", json);
+void otf_send_json(String json, OTF::Response &res) {
+  res.writeStatus(200, "OK");
+  res.writeHeader(F("content-type"), F("application/json"));
+  res.writeHeader(F("access-control-allow-origin"), (char *) "*"); // from esp8266 2.4 this has to be sent explicitly
+  res.writeBodyChunk((char *) "%s",json.c_str());
 }
 
-void server_send_result(byte code, const char* item = NULL) {
+void otf_send_result(byte code, OTF::Response &res, const char* item = NULL) {
   String json = F("{\"result\":");
   json += code;
   if (!item) item = "";
@@ -128,60 +88,19 @@ void server_send_result(byte code, const char* item = NULL) {
   json += item;
   json += F("\"");
   json += F("}");
-  server_send_json(json);
+  otf_send_json(json, res);
 }
 
-void server_send_result(const char* command, byte code, const char* item = NULL) {
-  if(!command) server_send_result(code, item);
-}
-
-bool get_value_by_key(const char* key, uint& val) {
-  if(server->hasArg(key)) {
-    val = server->arg(key).toInt();   
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool get_value_by_key(const char* key, String& val) {
-  if(server->hasArg(key)) {
-    val = server->arg(key);   
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool findArg(const char *command, const char *name) {
-  if(command) {
-    return findKeyVal(command, name);
-    // todo
-  } else {
-    return server->hasArg(name);
-  }
-}
-
-char tmp_buffer[TMP_BUFFER_SIZE];
-
-bool get_value_by_key(const char *command, const char *key, uint& val) {
-  if(command) {
-    byte ret = findKeyVal(command, key, tmp_buffer, TMP_BUFFER_SIZE);
-    val = String(tmp_buffer).toInt();
-    return ret;
-  } else {
-    return get_value_by_key(key, val);
-  }
-}
-
-bool get_value_by_key(const char *command, const char *key, String& val) {
-  if(command) {
-    byte ret = findKeyVal(command, key, tmp_buffer, TMP_BUFFER_SIZE);
-    val = String(tmp_buffer);
-    return ret;
-  } else {
-    return get_value_by_key(key, val);
-  }
+void updateserver_send_result(byte code, const char* item = NULL) {
+  String json = F("{\"result\":");
+  json += code;
+  if (!item) item = "";
+  json += F(",\"item\":\"");
+  json += item;
+  json += F("\"");
+  json += F("}");
+  updateServer->sendHeader("Access-Control-Allow-Origin", "*"); // from esp8266 2.4 this has to be sent explicitly
+  updateServer->send(200, "application/json", json);
 }
 
 String ipString;
@@ -232,23 +151,21 @@ void restart_in(uint32_t ms) {
   }
 }
 
-void on_home()
+void on_home(const OTF::Request &req, OTF::Response &res)
 {
   if(curr_mode == OG_MOD_AP) {
-    server_send_html_P(ap_home_html);
+    otf_send_html_P((const __FlashStringHelper *) ap_home_html, res);
   } else {
-    server_send_html_P(sta_home_html);
+    otf_send_html_P((const __FlashStringHelper *) sta_home_html, res);
   }
 }
 
-void on_sta_view_options() {
-  if(curr_mode == OG_MOD_AP) return;
-  server_send_html_P(sta_options_html);
+void on_sta_view_options(const OTF::Request &req, OTF::Response &res) {
+  otf_send_html_P((const __FlashStringHelper *) sta_options_html, res);
 }
 
-void on_sta_view_logs() {
-  if(curr_mode == OG_MOD_AP) return;
-  server_send_html_P(sta_logs_html);
+void on_sta_view_logs(const OTF::Request &req, OTF::Response &res) {
+  otf_send_html_P((const __FlashStringHelper *) sta_logs_html, res);
 }
 
 char dec2hexchar(byte dec) {
@@ -327,14 +244,14 @@ void sta_controller_fill_json(String& json) {
   json += F("}");
 }
 
-void on_sta_controller() {
+void on_sta_controller(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
   String json;
   sta_controller_fill_json(json);
-  server_send_json(json);
+  otf_send_json(json, res);
 }
 
-void on_sta_debug() {
+void on_sta_debug(const OTF::Request &req, OTF::Response &res) {
   String json = "";
   json += F("{");
   json += F("\"rcnt\":");
@@ -356,10 +273,10 @@ void on_sta_debug() {
   json += F("\",\"Freeheap\":");
   json += (uint16_t)ESP.getFreeHeap();
   json += F("}");
-  server_send_json(json);
+  otf_send_json(json, res);
 }
 
-void sta_logs_fill_json(String& json) {
+void sta_logs_fill_json(String& json, OTF::Response &res) {
   json = "";
   json += F("{\"name\":\"");
   json += og.options[OPTION_NAME].sval;
@@ -368,7 +285,7 @@ void sta_logs_fill_json(String& json) {
   json += F(",\"logs\":[");
   if(!og.read_log_start()) {
     json += F("]}");
-    server_send_json(json);
+    otf_send_json(json, res);
     return;
   }
   LogStruct l;
@@ -388,58 +305,58 @@ void sta_logs_fill_json(String& json) {
   json += F("]}");
 }
 
-void on_sta_logs() {
+void on_sta_logs(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
   String json;
-  sta_logs_fill_json(json);
-  server_send_json(json);
+  sta_logs_fill_json(json, res);
+  otf_send_json(json, res);
 }
 
-bool verify_device_key() {
-  if(server->hasArg("dkey") && (server->arg("dkey") == og.options[OPTION_DKEY].sval))
+bool verify_device_key(const OTF::Request &req) {
+  const char *dkey = req.getQueryParameter("dkey");
+  if(dkey != NULL && strcmp(dkey, og.options[OPTION_DKEY].sval.c_str()) == 0)
     return true;
   return false;
 }
 
-bool verify_device_key(const char* command) {
-  if(command) return true;
-  else return verify_device_key();
-}
-
-void on_reset_all(){
-  if(!verify_device_key()) {
-    server_send_result(HTML_UNAUTHORIZED);
+void on_reset_all(const OTF::Request &req, OTF::Response &res){
+  if(!verify_device_key(req)) {
+    otf_send_result(HTML_UNAUTHORIZED, res);
     return;
   }
 
   og.state = OG_STATE_RESET;
-  server_send_result(HTML_SUCCESS);
+  return otf_send_result(HTML_SUCCESS, res);
 }
 
-void on_clear_log() {
-  if(!verify_device_key()) {
-    server_send_result(HTML_UNAUTHORIZED);
+void on_clear_log(const OTF::Request &req, OTF::Response &res) {
+  if(!verify_device_key(req)) {
+    otf_send_result(HTML_UNAUTHORIZED, res);
     return;
   }
   og.log_reset();
-  server_send_result(HTML_SUCCESS);  
+  otf_send_result(HTML_SUCCESS, res);
 }
 
-void sta_change_controller_main(const char *command) {
+void sta_change_controller_main(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
 
-  if(!verify_device_key(command)) {
-    server_send_result(command, HTML_UNAUTHORIZED);
+  if(!verify_device_key(req)) {
+    otf_send_result(HTML_UNAUTHORIZED, res);
     return;
   }
 
-  if(findArg(command, "click") || findArg(command, "close") || findArg(command, "open")) {
+  bool click = req.getQueryParameter("click");
+  bool close = req.getQueryParameter("close");
+  bool open = req.getQueryParameter("open");
+
+  if(click || close || open) {
     DEBUG_PRINTLN(F("Received button request (click, close, or open)"));
-    server_send_result(command, HTML_SUCCESS);
+    otf_send_result(HTML_SUCCESS, res);
     //1 is open
-    if ((findArg(command, "close") && door_status) ||
-        (findArg(command, "open") && !door_status) ||
-        (findArg(command, "click"))) {
+    if ((close && door_status) ||
+        (open && !door_status) ||
+        (click)) {
       DEBUG_PRINTLN(F("Valid command recieved based on door status"));
       if(!og.options[OPTION_ALM].ival) {
         // if alarm is not enabled, trigger relay right away
@@ -451,33 +368,31 @@ void sta_change_controller_main(const char *command) {
     }else{
       DEBUG_PRINTLN(F("Command request not valid, door already in requested state"));
     }
-  } else if(findArg(command, "reboot")) {
-    server_send_result(command, HTML_SUCCESS);
+  } else if(req.getQueryParameter("reboot") != NULL) {
+    otf_send_result(HTML_SUCCESS, res);
     //restart_ticker.once_ms(1000, og.restart);
     restart_in(1000);
-  } else if(findArg(command, "apmode")) {
-    server_send_result(command, HTML_SUCCESS);
+  } else if(req.getQueryParameter("apmode") != NULL) {
+    otf_send_result(HTML_SUCCESS, res);
     og.reset_to_ap();
   } else {
-    server_send_result(command, HTML_NOT_PERMITTED);
+    return otf_send_result(HTML_NOT_PERMITTED, res);
   }
 
 }
 
-void on_sta_change_controller() {
-  sta_change_controller_main(NULL);  
+void on_sta_change_controller(const OTF::Request &req, OTF::Response &res) {
+  sta_change_controller_main(req, res);
 }
 
-void sta_change_options_main(const char *command) {
+void sta_change_options_main(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
 
-  if(!verify_device_key(command)) {
-    server_send_result(command, HTML_UNAUTHORIZED);
+  if(!verify_device_key(req)) {
+    otf_send_result(HTML_UNAUTHORIZED, res);
     return;
   }
 
-  uint ival = 0;
-  String sval;
   byte i;
   OptionStruct *o = og.options;
   
@@ -492,24 +407,26 @@ void sta_change_options_main(const char *command) {
       continue;
     
     if(o->max) {  // integer options
-      if(get_value_by_key(command, key, ival)) {
+      char *sval = req.getQueryParameter(key);
+      if(sval != NULL) {
+        uint ival = String(sval).toInt();
         if(ival>o->max) {	// check max limit
-          server_send_result(command, HTML_DATA_OUTOFBOUND, key);
+          otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
           return;
         }
         // check min limit
         if(i==OPTION_DRI && ival < 50) {
-        	server_send_result(command,HTML_DATA_OUTOFBOUND, key);
+        	otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
         	return;
         }
         if(i==OPTION_LSZ && ival < 20) {
           // minimal log size is 20
-          server_send_result(command, HTML_DATA_OUTOFBOUND, key);
+          otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
           return;
         }
         if(i==OPTION_CDT && ival < 50) {
           // click delay time should be at least 50 ms
-          server_send_result(command, HTML_DATA_OUTOFBOUND, key);
+          otf_send_result(HTML_DATA_OUTOFBOUND, res, key);
           return;
         }
         if(i==OPTION_USI && ival==1) {
@@ -521,45 +438,51 @@ void sta_change_options_main(const char *command) {
   }
   
   // Check device IP and gateway IP changes
-  String dvip, gwip, subn;
   const char* _dvip = "dvip";
   const char* _gwip = "gwip";
   const char* _subn = "subn";
+
+  String dvip = req.getQueryParameter(_dvip);
+  String gwip = req.getQueryParameter(_gwip);
+  String subn = req.getQueryParameter(_subn);
+
   if(usi) {
-    if(get_value_by_key(command, _dvip, dvip)) {
-      if(get_value_by_key(command, _gwip, gwip)) {
+    if(dvip != NULL) {
+      if(gwip != NULL) {
         // check validity of IP address
         IPAddress ip;
-        if(!ip.fromString(dvip)) {server_send_result(command, HTML_DATA_FORMATERROR, _dvip); return;}
-        if(!ip.fromString(gwip)) {server_send_result(command, HTML_DATA_FORMATERROR, _gwip); return;}
-        if(get_value_by_key(command, _subn, subn)) {
+        if(!ip.fromString(dvip)) {otf_send_result(HTML_DATA_FORMATERROR, res, _dvip); return;}
+        if(!ip.fromString(gwip)) {otf_send_result(HTML_DATA_FORMATERROR, res, _gwip); return;}
+        if(subn != NULL) {
           if(!ip.fromString(subn)) {
-            server_send_result(command, HTML_DATA_FORMATERROR, _subn);
+            otf_send_result(HTML_DATA_FORMATERROR, res, _subn);
             return;
           }
         }
       } else {
-        server_send_result(command, HTML_DATA_MISSING, _gwip);
+        otf_send_result(HTML_DATA_MISSING, res, _gwip);
         return;
       }              
     } else {
-      server_send_result(command, HTML_DATA_MISSING, _dvip);
+      otf_send_result(HTML_DATA_MISSING, res, _dvip);
       return;
     }
   }
   // Check device key change
-  String nkey, ckey;
   const char* _nkey = "nkey";
   const char* _ckey = "ckey";
+
+  String nkey = req.getQueryParameter(_nkey);
+  String ckey = req.getQueryParameter(_ckey);
   
-  if(get_value_by_key(command, _nkey, nkey)) {
-    if(get_value_by_key(command, _ckey, ckey)) {
+  if(nkey != NULL) {
+    if(ckey != NULL) {
       if(!nkey.equals(ckey)) {
-        server_send_result(command, HTML_MISMATCH, _ckey);
+        otf_send_result(HTML_MISMATCH, res, _ckey);
         return;
       }
     } else {
-      server_send_result(command, HTML_DATA_MISSING, _ckey);
+      otf_send_result(HTML_DATA_MISSING, res, _ckey);
       return;
     }
   }
@@ -572,38 +495,36 @@ void sta_change_options_main(const char *command) {
     if(i==OPTION_FWV || i==OPTION_MOD  || i==OPTION_SSID ||
       i==OPTION_PASS || i==OPTION_DKEY)
       continue;
-    
-    if(o->max) {  // integer options
-      if(get_value_by_key(command, key, ival)) {
+
+    char *sval = req.getQueryParameter(key);
+    if(sval != NULL) {
+      if (o->max) {  // integer options
+        uint ival = String(sval).toInt();
         o->ival = ival;
-      }
-    } else {
-      if(get_value_by_key(command, key, sval)) {
-        o->sval = sval;
+      } else {
+        o->sval = String(sval);
       }
     }
   }
 
   if(usi) {
-    get_value_by_key(command, _dvip, dvip);
-    get_value_by_key(command, _gwip, gwip);
     og.options[OPTION_DVIP].sval = dvip;
     og.options[OPTION_GWIP].sval = gwip;
-    if(get_value_by_key(command, _subn, subn)) {
+    if(subn != NULL) {
       og.options[OPTION_SUBN].sval = subn;
     }
   }
   
-  if(get_value_by_key(command, _nkey, nkey)) {
+  if(nkey != NULL) {
       og.options[OPTION_DKEY].sval = nkey;
   }
 
   og.options_save();
-  server_send_result(command, HTML_SUCCESS);
+  otf_send_result(HTML_SUCCESS, res);
 }
 
-void on_sta_change_options() {
-  sta_change_options_main(NULL);
+void on_sta_change_options(const OTF::Request &req, OTF::Response &res) {
+  sta_change_options_main(req, res);
 }
 
 void sta_options_fill_json(String& json) {
@@ -634,42 +555,44 @@ void sta_options_fill_json(String& json) {
   json += F("}");
 }
 
-void on_sta_options() {
+void on_sta_options(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_AP) return;
   String json;
   sta_options_fill_json(json);
-  server_send_json(json);
+  otf_send_json(json, res);
 }
 
-void on_ap_scan() {
+void on_ap_scan(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_STA) return;
-  server_send_json(scanned_ssids);
+  otf_send_json(scanned_ssids, res);
 }
 
-void on_ap_change_config() {
+void on_ap_change_config(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_STA) return;
-  if(server->hasArg("ssid")&&server->arg("ssid").length()!=0) {
-    og.options[OPTION_SSID].sval = server->arg("ssid");
-    og.options[OPTION_PASS].sval = server->arg("pass");
+  char *ssid = req.getQueryParameter("ssid");
+  if(ssid!=NULL&&strlen(ssid)!=0) {
+    og.options[OPTION_SSID].sval = ssid;
+    og.options[OPTION_PASS].sval = req.getQueryParameter("pass");
     // if cloud token is provided, save it
-    if(server->hasArg("auth")&&server->arg("auth").length()!=0)
-      og.options[OPTION_AUTH].sval = server->arg("auth");
+    char *auth = req.getQueryParameter("auth");
+    if(auth!=NULL&&strlen(auth)!=0)
+      og.options[OPTION_AUTH].sval = auth;
     og.options_save();
-    server_send_result(HTML_SUCCESS);
+    otf_send_result(HTML_SUCCESS, res);
     og.state = OG_STATE_TRY_CONNECT;
 
   } else {
-    server_send_result(HTML_DATA_MISSING, "ssid");
+    otf_send_result(HTML_DATA_MISSING, res, "ssid");
   }
 }
 
-void on_ap_try_connect() {
+void on_ap_try_connect(const OTF::Request &req, OTF::Response &res) {
   if(curr_mode == OG_MOD_STA) return;
   String json = "{";
   json += F("\"ip\":");
   json += (WiFi.status() == WL_CONNECTED) ? (uint32_t)WiFi.localIP() : 0;
   json += F("}");
-  server_send_json(json);
+  otf_send_json(json, res);
   if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
     /*DEBUG_PRINTLN(F("STA connected, updating option file"));
     og.options[OPTION_MOD].ival = OG_MOD_STA;
@@ -683,7 +606,7 @@ void on_ap_try_connect() {
   }
 }
 
-void on_ap_debug() {
+void on_ap_debug(const OTF::Request &req, OTF::Response &res) {
   String json = "";
   json += F("{");
   json += F("\"dist\":");
@@ -691,7 +614,7 @@ void on_ap_debug() {
   json += F(",\"fwv\":");
   json += og.options[OPTION_FWV].ival;
   json += F("}");
-  server_send_json(json);
+  otf_send_json(json, res);
 }
 
 // MQTT callback to read "Button" requests
@@ -740,9 +663,13 @@ void mqtt_callback(const MQTT::Publish& pub) {
 void do_setup()
 {
   DEBUG_BEGIN(115200);
-  if(server) {
-    delete server;
-    server = NULL;
+  if(otf) {
+    delete otf;
+    otf = NULL;
+  }
+  if(updateServer) {
+    delete updateServer;
+    updateServer = NULL;
   }
   WiFi.persistent(false); // turn off persistent, fixing flash crashing issue
   og.begin();
@@ -755,11 +682,23 @@ void do_setup()
   DEBUG_PRINTLN(F(__TIME__));
   curr_cloud_access_en = og.get_cloud_access_en();
   curr_mode = og.get_mode();
-  if(!server) {
-    server = new ESP8266WebServer(og.options[OPTION_HTP].ival);
+  if(!otf) {
+    if(og.options[OPTION_AUTH].sval) {
+      // Initialize with remote connection if a device key was specified.
+      otf = new OTF::OpenThingsFramework(og.options[OPTION_HTP].ival, og.options[OPTION_BDMN].sval, og.options[OPTION_BPRT].ival, og.options[OPTION_AUTH].sval);
+      DEBUG_PRINT(F("Starting OTF with remote connection"));
+    } else {
+      // Initialize just the local server if no device key was specified.
+      otf = new OTF::OpenThingsFramework(og.options[OPTION_HTP].ival);
+      DEBUG_PRINT(F("Starting OTF with just local connection"));
+    }
     if(curr_mode == OG_MOD_AP) dns = new DNSServer();
     DEBUG_PRINT(F("server started @ "));
     DEBUG_PRINTLN(og.options[OPTION_HTP].ival);
+  }
+  if(!updateServer) {
+    updateServer = new ESP8266WebServer(8080);
+    DEBUG_PRINT(F("update server started"));
   }
   led_blink_ms = LED_FAST_BLINK;
   
@@ -830,29 +769,30 @@ byte check_door_status_hist() {
   return DOOR_STATUS_MIXED;
 }
 
-void on_sta_update() {
-  server_send_html_P(sta_update_html);
+void on_sta_update(const OTF::Request &req, OTF::Response &res) {
+  otf_send_html_P((const __FlashStringHelper *) sta_update_html, res);
 }
 
-void on_ap_update() {
-  server_send_html_P(ap_update_html);
+void on_ap_update(const OTF::Request &req, OTF::Response &res) {
+  otf_send_html_P((const __FlashStringHelper *) ap_update_html, res);
 }
 
 void on_sta_upload_fin() {
 
-  if(!verify_device_key()) {
-    server_send_result(HTML_UNAUTHORIZED);
+  // Verify the device key.
+  if(!(updateServer->hasArg("dkey") && (updateServer->arg("dkey") == og.options[OPTION_DKEY].sval))) {
+    updateserver_send_result(HTML_UNAUTHORIZED);
     Update.end(false); // Update.reset(); FAB
     return;
   }
 
   // finish update and check error
   if(!Update.end(true) || Update.hasError()) {
-    server_send_result(HTML_UPLOAD_FAILED);
+    updateserver_send_result(HTML_UPLOAD_FAILED);
     return;
   }
-  
-  server_send_result(HTML_SUCCESS);
+
+  updateserver_send_result(HTML_SUCCESS);
   //restart_ticker.once_ms(1000, og.restart);
   restart_in(1000);
 }
@@ -860,11 +800,10 @@ void on_sta_upload_fin() {
 void on_ap_upload_fin() { on_sta_upload_fin(); }
 
 void on_sta_upload() {
-  HTTPUpload& upload = server->upload();
+  HTTPUpload& upload = updateServer->upload();
   if(upload.status == UPLOAD_FILE_START){
     DEBUG_PRINTLN(F("Stopping all network clients"));
     WiFiUDP::stopAll();
-    Blynk.disconnect(); // disconnect Blynk during firmware upload
     mqttclient.disconnect();
     DEBUG_PRINT(F("prepare to upload: "));
     DEBUG_PRINTLN(upload.filename);
@@ -877,20 +816,20 @@ void on_sta_upload() {
     if(Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
       DEBUG_PRINTLN(F("size mismatch"));
     }
-      
+
   } else if(upload.status == UPLOAD_FILE_END) {
-    
+
     DEBUG_PRINTLN(F("upload completed"));
-       
+
   } else if(upload.status == UPLOAD_FILE_ABORTED){
     Update.end();
     DEBUG_PRINTLN(F("upload aborted"));
   }
-  delay(0);    
+  delay(0);
 }
 
 void on_ap_upload() {
-  HTTPUpload& upload = server->upload();
+  HTTPUpload& upload = updateServer->upload();
   if(upload.status == UPLOAD_FILE_START){
     Serial.println(F("prepare to upload: "));
     Serial.println(upload.filename);
@@ -948,11 +887,6 @@ bool mqtt_connect_subscibe() {
 void perform_notify(String s) {
   DEBUG_PRINT(F("Sending Notify to connected systems, value:"));
   DEBUG_PRINTLN(s);
-  // Blynk notification
-  if(curr_cloud_access_en && Blynk.connected()) {
-    DEBUG_PRINTLN(F(" Blynk Notify"));
-    Blynk.notify(s);
-  }
 
   // IFTTT notification
   if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
@@ -1155,19 +1089,9 @@ void check_status() {
       else if(event == DOOR_STATUS_JUST_CLOSED) {	
         DEBUG_PRINTLN(F(" Sending State Change event to connected systems, value: DOOR_STATUS_JUST_CLOSED")); }
 #endif
-      
-      // Blynk notification
+
 #if 0
       byte ato = og.options[OPTION_ATO].ival;
-      if(curr_cloud_access_en && Blynk.connected() && ato) {
-        //The official firmware only sends these notifications on ato enabled (which seems a somewhat unrelated function)
-        //Maintain backwards compat and use same logic
-        DEBUG_PRINTLN(F(" Notify Blynk with text notification"));
-        if(event == DOOR_STATUS_JUST_OPENED)  {	
-          Blynk.notify(og.options[OPTION_NAME].sval + " just opened!");}
-        else if(event == DOOR_STATUS_JUST_CLOSED) {	
-          Blynk.notify(og.options[OPTION_NAME].sval + " just closed!");}
-      }
 
       // IFTTT notification
       if(og.options[OPTION_IFTT].sval.length()>7) { // key size is at least 8
@@ -1226,39 +1150,6 @@ void check_status() {
     }
     
     // Process dynamics: automation and notifications
-    // report status to Blynk
-    if(curr_cloud_access_en && Blynk.connected()) {
-      DEBUG_PRINTLN(F(" Update Blynk (State Refresh)"));
-      
-      static uint old_distance = 0;
-      static byte old_door_status = 0xff, old_vehicle_status = 0xff;
-      static String old_ip = "";
-      if(distance != old_distance) {  Blynk.virtualWrite(BLYNK_PIN_DIST, distance); old_distance = distance; }
-      if(door_status != old_door_status) { (door_status) ? blynk_door.on() : blynk_door.off(); old_door_status = door_status; }
-      if(vehicle_status != old_vehicle_status) { (vehicle_status==1) ? blynk_car.on() : blynk_car.off(); old_vehicle_status = vehicle_status; }
-      if(old_ip != get_ip()) { Blynk.virtualWrite(BLYNK_PIN_IP, get_ip()); old_ip = get_ip(); }
-
-      // report json strings to Blynk
-      /* comment this section out as the features are not fully ready yet
-      String json;
-      static String old_json = "";
-      sta_controller_fill_json(json);
-      if(old_json != json) { Blynk.virtualWrite(BLYNK_PIN_JC, json); old_json = json; }
-      
-      if(og.get_dirty_bit(DIRTY_BIT_JO)) {
-        sta_options_fill_json(json);
-        Blynk.virtualWrite(BLYNK_PIN_JO, json);
-        og.set_dirty_bit(DIRTY_BIT_JO, 0);
-      }
-      
-      if(og.get_dirty_bit(DIRTY_BIT_JL)) {
-        sta_logs_fill_json(json);
-        Blynk.virtualWrite(BLYNK_PIN_JL, json);
-        og.set_dirty_bit(DIRTY_BIT_JL, 0);
-      }
-      */
-    }
-    
     process_dynamics(event);
     checkstatus_timeout = curr_utc_time + og.options[OPTION_RIV].ival;
     
@@ -1333,16 +1224,16 @@ void do_loop() {
       delay(500);
       dns->setErrorReplyCode(DNSReplyCode::NoError);
       dns->start(53, "*", WiFi.softAPIP());
-      server->on("/",   on_home);    
-      server->on("/js", on_ap_scan);
-      server->on("/cc", on_ap_change_config);
-      server->on("/jt", on_ap_try_connect);
-      server->on("/db", on_ap_debug);      
-      server->on("/update", HTTP_GET, on_ap_update);
-      server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);      
-      server->on("/resetall",on_reset_all);
-      server->onNotFound(on_home);
-      server->begin();
+      otf->on("/",   on_home);
+      otf->on("/js", on_ap_scan);
+      otf->on("/cc", on_ap_change_config);
+      otf->on("/jt", on_ap_try_connect);
+      otf->on("/db", on_ap_debug);
+      // FIXME get update ap updates working.
+      otf->on("/update", on_ap_update, OTF::HTTP_GET);
+      updateServer->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
+      otf->on("/resetall",on_reset_all);
+      otf->onMissingPage(on_home);
       DEBUG_PRINTLN(F("Web Server endpoints (AP mode) registered"));
       og.state = OG_STATE_CONNECTED;
       DEBUG_PRINTLN(WiFi.softAPIP());
@@ -1376,27 +1267,22 @@ void do_loop() {
       if(MDNS.begin(get_ap_ssid().c_str())) {
         DEBUG_PRINTLN(F("MDNS registered"));
       }
-      server->on("/", on_home);
-      server->on("/jc", on_sta_controller);
-      server->on("/jo", on_sta_options);
-      server->on("/jl", on_sta_logs);
-      server->on("/vo", on_sta_view_options);
-      server->on("/vl", on_sta_view_logs);
-      server->on("/cc", on_sta_change_controller);
-      server->on("/co", on_sta_change_options);
-      server->on("/db", on_sta_debug);
-      server->on("/update", HTTP_GET, on_sta_update);
-      server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
-      server->on("/clearlog", on_clear_log);
-      server->on("/resetall",on_reset_all);
-      server->begin();
+      otf->on("/", on_home);
+      otf->on("/jc", on_sta_controller);
+      otf->on("/jo", on_sta_options);
+      otf->on("/jl", on_sta_logs);
+      otf->on("/vo", on_sta_view_options);
+      otf->on("/vl", on_sta_view_logs);
+      otf->on("/cc", on_sta_change_controller);
+      otf->on("/co", on_sta_change_options);
+      otf->on("/db", on_sta_debug);
+      // FIXME get sta updates working.
+      otf->on("/update", on_sta_update, OTF::HTTP_GET);
+      updateServer->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
+      otf->on("/clearlog", on_clear_log);
+      otf->on("/resetall",on_reset_all);
       DEBUG_PRINTLN(F("Web Server endpoints (STA mode) registered"));
 
-      if(curr_cloud_access_en) {
-        Blynk.config(og.options[OPTION_AUTH].sval.c_str(), og.options[OPTION_BDMN].sval.c_str(), (uint16_t) og.options[OPTION_BPRT].ival); // use the config function
-        Blynk.connect();
-        DEBUG_PRINTLN(F("Blynk Connected"));
-      }
       if(og.options[OPTION_MQTT].sval.length()>8) {
         mqtt_connect_subscibe();
         DEBUG_PRINTLN(F("MQTT Connected"));
@@ -1422,13 +1308,15 @@ void do_loop() {
     
   case OG_STATE_WAIT_RESTART:
     if(dns) dns->processNextRequest();  
-    if(server) server->handleClient();    
+    if(otf) otf->loop();
+    if(updateServer) updateServer->handleClient();
     break;
     
   case OG_STATE_CONNECTED: //THIS IS THE MAIN LOOP
     if(curr_mode == OG_MOD_AP) {
       dns->processNextRequest();
-      server->handleClient();
+      otf->loop();
+      updateServer->handleClient();
       check_status_ap();
       connecting_timeout = 0;
       if(og.options[OPTION_MOD].ival == OG_MOD_STA) {
@@ -1448,10 +1336,9 @@ void do_loop() {
       if(WiFi.status() == WL_CONNECTED) {
         time_keeping();
         check_status(); //This checks the door, sends info to services and processes the automation rules
-        server->handleClient();
+        otf->loop();
+        updateServer->handleClient();
 
-        if(curr_cloud_access_en)
-          Blynk.run();
         //Handle MQTT
         if(og.options[OPTION_MQTT].sval.length()>8) {
           if (!mqttclient.connected()) {
@@ -1479,37 +1366,4 @@ void do_loop() {
   process_ui();
   if(og.alarm)
     process_alarm();
-}
-
-BLYNK_WRITE(BLYNK_PIN_RELAY) {
-  DEBUG_PRINTLN(F("Received Blynk generated button request"));
-  if(!og.options[OPTION_ALM].ival) {
-    // if alarm is disabled, trigger right away
-    if(param.asInt()) {
-      og.set_relay(HIGH);
-    } else {
-      og.set_relay(LOW);
-    }
-  } else {
-    // otherwise, set alarm
-    if(param.asInt()) {
-      og.set_alarm();
-    }  
-  }
-}
-
-BLYNK_WRITE(BLYNK_PIN_CC) {
-  /* comment this section out as the features are not fully ready yet
-  DEBUG_PRINTLN(F("Received Blynk cc request"));
-  DEBUG_PRINTLN(param.asStr());
-  sta_change_controller_main(param.asStr());
-  */
-}
-
-BLYNK_WRITE(BLYNK_PIN_CO) {
-	/* comment this section out as the features are not fully ready yet
-  DEBUG_PRINTLN(F("Received Blynk co request"));
-  DEBUG_PRINTLN(param.asStr());  
-  sta_change_options_main(param.asStr());
-  */
 }

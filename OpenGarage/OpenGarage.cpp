@@ -64,8 +64,8 @@ OptionStruct OpenGarage::options[] = {
   {"ssid", 0, 0, ""},  // string options have 0 max value
   {"pass", 0, 0, ""},
   {"auth", 0, 0, ""},
-  {"bdmn", 0, 0, "blynk-cloud.com"},
-  {"bprt", 80,65535, ""},
+  {"bdmn", 0, 0, "cloud.openthings.io"},
+  {"bprt", 8080,65535, ""},
   {"dkey", 0, 0, DEFAULT_DKEY},
   {"name", 0, 0, DEFAULT_NAME},
   {"iftt", 0, 0, ""},
@@ -347,7 +347,7 @@ void OpenGarage::read_TH_sensor(float& C, float& H) {
 }
 
 bool OpenGarage::get_cloud_access_en() {
-  if(options[OPTION_AUTH].sval.length()==32) {
+  if(options[OPTION_AUTH].sval.length()) {
     return true;
   }
   return false;

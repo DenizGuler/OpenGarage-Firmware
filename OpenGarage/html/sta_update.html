@@ -9,7 +9,7 @@
 <div data-role='page' id='page_update'>
   <div data-role='header'><h3>OpenGarage Firmware Update</h3></div>
   <div data-role='content'>
-    <form method='POST' action='/update' id='fm' enctype='multipart/form-data'>
+    <form method='POST' action='' id='fm' enctype='multipart/form-data'>
     <table cellspacing=4>
     <tr><td><input type='file' name='file' accept='.bin' id='file'></td></tr>
     <tr><td><b>Device key: </b><input type='password' name='dkey' size=16 maxlength=16 id='dkey'></td></tr>
@@ -61,6 +61,9 @@ $('#btn_submit').click(function(e){
   };
   xhr.open('POST', 'update', true);
   xhr.send(fd);
+});
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('fm').action = '//' + window.location.hostname + ':8080' + window.location.pathname;
 });
 </script>
 </body>

@@ -82,18 +82,6 @@
 #define OG_STATE_WAIT_RESTART   4
 #define OG_STATE_RESET          9
 
-#define BLYNK_PIN_DOOR  V0
-#define BLYNK_PIN_RELAY V1
-#define BLYNK_PIN_LCD   V2
-#define BLYNK_PIN_DIST  V3
-#define BLYNK_PIN_CAR   V4
-#define BLYNK_PIN_IP    V5
-#define BLYNK_PIN_JC    V6
-#define BLYNK_PIN_CC    V7
-#define BLYNK_PIN_JO    V8
-#define BLYNK_PIN_CO    V9
-#define BLYNK_PIN_JL    V10
-
 enum {
   DIRTY_BIT_JC = 0,
   DIRTY_BIT_JO,
@@ -134,9 +122,10 @@ typedef enum {
   OPTION_USI,     // use static IP
   OPTION_SSID,    // wifi ssid
   OPTION_PASS,    // wifi password
-  OPTION_AUTH,    // Blynk authentication token
-  OPTION_BDMN,    // Blynk Domain
-  OPTION_BPRT,    // Blynk Port
+  // TODO rename these.
+  OPTION_AUTH,    // OTF device key
+  OPTION_BDMN,    // OTF Domain
+  OPTION_BPRT,    // OTF Port
   OPTION_DKEY,    // device key
   OPTION_NAME,    // device name
   OPTION_IFTT,    // IFTTT token
@@ -158,8 +147,6 @@ typedef enum {
 #define LED_SLOW_BLINK 500
 
 #define TIME_SYNC_TIMEOUT  1800 //Issues connecting to MQTT can throw off the time function, sync more often
-
-#define TMP_BUFFER_SIZE 100
 
 /** Serial debug functions */
 //#define SERIAL_DEBUG
