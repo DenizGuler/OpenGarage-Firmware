@@ -68,6 +68,7 @@ void do_setup();
 void otf_send_html_P(OTF::Response &res, const __FlashStringHelper *content) {
   res.writeStatus(200, "OK");
   res.writeHeader(F("content-type"), F("text/html"));
+  res.writeHeader(F("access-control-allow-origin"), (char *) "*"); // from esp8266 2.4 this has to be sent explicitly
   res.writeBodyChunk((char *) "%s", content);
   DEBUG_PRINT(strlen_P((char *) content));
   DEBUG_PRINTLN(F(" bytes sent."));
