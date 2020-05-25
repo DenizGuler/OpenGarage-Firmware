@@ -314,6 +314,9 @@ void on_sta_logs(const OTF::Request &req, OTF::Response &res) {
 }
 
 bool verify_device_key(const OTF::Request &req) {
+  if(req.isCloudRequest()){
+    return true;
+  }
   const char *dkey = req.getQueryParameter("dkey");
   if(dkey != NULL && strcmp(dkey, og.options[OPTION_DKEY].sval.c_str()) == 0)
     return true;
