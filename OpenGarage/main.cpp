@@ -794,6 +794,8 @@ void on_sta_upload_fin() {
   // finish update and check error
   if(!Update.end(true) || Update.hasError()) {
     updateserver_send_result(HTML_UPLOAD_FAILED);
+    Serial.print(F("OTA update failed: "));
+    Update.printError(Serial);
     return;
   }
 
