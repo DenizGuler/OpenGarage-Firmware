@@ -361,8 +361,8 @@ const char sta_options_html[] PROGMEM = R"(<head><title>OpenGarage</title><meta 
 <div id='div_cloud' style='display:none;'>
 <table cellpadding=1>
 <tr><td><b>OTC Token:</b></td><td><input type='text' size=20 maxlength=32 id='auth' data-mini='true' value='-'></td></tr>
-<tr><td><b>OTF Domain:</b></td><td><input type='text' size=20 maxlength=32 id='bdmn' data-mini='true' value='-'></td></tr>
-<tr><td><b>OTF Port:</b></td><td><input type='text' size=5 maxlength=5 id='bprt' data-mini='true' value=0></td></tr>
+<tr><td><b>OTC Domain:</b></td><td><input type='text' size=20 maxlength=32 id='bdmn' data-mini='true' value='-'></td></tr>
+<tr><td><b>OTC Port:</b></td><td><input type='text' size=5 maxlength=5 id='bprt' data-mini='true' value=0></td></tr>
 <tr><td><b>IFTTT Key:</b></td><td><input type='text' size=20 maxlength=64 id='iftt' data-mini='true' value='-'></td></tr>
 <tr><td><b>MQTT Server:</b></td><td><input type='text' size=16 maxlength=20 id='mqtt' data-mini='true' value=''></td></tr>
 </table>
