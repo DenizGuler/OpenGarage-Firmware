@@ -48,6 +48,7 @@ OptionStruct OpenGarage::options[] = {
   {"vth", 150,       65535, ""},
   {"riv", 5,           300, ""},
   {"alm", OG_ALM_5,      2, ""},
+  {"aoo", 0,             1, ""},
   {"lsz", DEFAULT_LOG_SIZE,400,""},
   {"tsn", OG_TSN_NONE, 255, ""},
   {"htp", 80,        65535, ""},
@@ -72,7 +73,8 @@ OptionStruct OpenGarage::options[] = {
   {"mqtt", 0, 0, "-.-.-.-"},
   {"dvip", 0, 0, "-.-.-.-"},
   {"gwip", 0, 0, "-.-.-.-"},
-  {"subn", 0, 0, "255.255.255.0"}
+  {"subn", 0, 0, "255.255.255.0"},
+  {"dns1", 0, 0, "8.8.8.8"}
 };
 
 /* Variables and functions for handling Ultrasonic Distance sensor */
@@ -424,11 +426,12 @@ void OpenGarage::play_note(uint freq) {
 
 void OpenGarage::config_ip() {
   if(options[OPTION_USI].ival) {
-    IPAddress dvip, gwip, subn;
+    IPAddress dvip, gwip, subn, dns1;
     if(dvip.fromString(options[OPTION_DVIP].sval) &&
-       gwip.fromString(options[OPTION_GWIP].sval) &&
-       subn.fromString(options[OPTION_SUBN].sval)) {
-      WiFi.config(dvip, gwip, subn);
+      gwip.fromString(options[OPTION_GWIP].sval) &&
+      subn.fromString(options[OPTION_SUBN].sval) &&
+      dns1.fromString(options[OPTION_DNS1].sval)) {
+      WiFi.config(dvip, gwip, subn, dns1, gwip);
     }
   }
 }
