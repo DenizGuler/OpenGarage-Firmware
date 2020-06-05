@@ -140,6 +140,7 @@ const char sta_home_html[] PROGMEM = R"(<head><title>OpenGarage</title><meta nam
 <tr><td><b>Distance:</b></td><td><label id='lbl_dist'>-</label></td><td></td></tr>
 <tr><td><b>Read&nbsp;Count:</b></td><td><label id='lbl_beat'>-</label></td><td></td></tr>
 <tr><td><b>WiFi&nbsp;Signal:</b></td><td colspan='2'><label id='lbl_rssi'>-</label></td></tr>
+<tr><td><b>OTC Status:</b></td><td colspan='2'><label id='lbl_otcs'>-</label></td></tr>
 <tr id='tbl_th' style='display:none;'><td><b>T/H sensor:</b></td><td colspan='2'><label id='lbl_th'>-</label></td></tr>
 <tr><td><b>Device&nbsp;Key:</b></td><td colspan='2' ><input type='password' size=20 maxlength=32 name='dkey' id='dkey'></td></tr>
 <tr><td colspan=3><label id='msg'></label></td></tr>
@@ -239,6 +240,7 @@ $('#pic').attr('src', jd.door?'https://github.com/OpenGarage/OpenGarage-Firmware
 }
 $('#lbl_beat').text(jd.rcnt);
 $('#lbl_rssi').text((jd.rssi>-71?'Good':(jd.rssi>-81?'Weak':'Poor')) +' ('+ jd.rssi +' dBm)');
+$('#lbl_otcs').text(["Not enabled","Unable to connect","Disconnected","Connected"][jd.otcs]+" since "+new Date(jd.otcc*1000));
 $('#head_name').text(jd.name);
 $('#btn_click').html(jd.door?'Close Door':'Open Door').button('refresh');
 if(typeof(jd.temp)!='undefined') {$('#tbl_th').show(); $('#lbl_th').text(jd.temp.toFixed(1)+String.fromCharCode(176)+'C / '+(jd.temp*1.8+32).toFixed(1)+String.fromCharCode(176)+'F (H:'+jd.humid.toFixed(1)+'%)');}

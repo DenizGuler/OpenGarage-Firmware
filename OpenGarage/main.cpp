@@ -242,6 +242,10 @@ void sta_controller_fill_json(String& json) {
   	json += F(",\"humid\":");
   	json += humid;
   }
+  json += F(",\"otcs\":");
+  json += otf->getCloudStatus();
+  json += F(",\"otcc\":");
+  json += curr_utc_time - otf->getTimeSinceLastCloudStatusChange() / 1000;
   json += F("}");
 }
 
