@@ -69,8 +69,8 @@ OptionStruct OpenGarage::options[] = {
   {"bprt", 80,65535, ""},
   {"dkey", 0, 0, DEFAULT_DKEY},
   {"name", 0, 0, DEFAULT_NAME},
-  {"iftt", 0, 0, ""},
-  {"mqtt", 0, 0, "-.-.-.-"},
+  {"iftt", 0, 0, DEFAULT_IFTTT_JSON},
+  {"mqtt", 0, 0, DEFAULT_MQTT_JSON}, 
   {"dvip", 0, 0, "-.-.-.-"},
   {"gwip", 0, 0, "-.-.-.-"},
   {"subn", 0, 0, "255.255.255.0"},
@@ -170,13 +170,12 @@ void OpenGarage::begin() {
 }
 
 void OpenGarage::options_setup() {
-  int i;
   if(!SPIFFS.exists(config_fname)) { // if config file does not exist
     options_save(); // save default option values
     return;
   } 
   options_load();
-  
+
   if(options[OPTION_FWV].ival != OG_FWV)  {
     // if firmware version has changed
     // re-save options, thus preserving
@@ -238,6 +237,9 @@ void OpenGarage::options_load() {
       options[idx].sval = sval;
     }
   }
+  // mqtt_config = get_mqtt_config();
+  // ifttt_config = get_ifttt_config();
+
   DEBUG_PRINTLN(F("ok"));
   file.close();
 }
@@ -260,6 +262,30 @@ void OpenGarage::options_save() {
   DEBUG_PRINTLN(F("ok"));  
   file.close();
   set_dirty_bit(DIRTY_BIT_JO, 1);
+}
+
+MqttStruct OpenGarage::get_mqtt_config() {
+  StaticJsonDocument<(JSON_OBJECT_SIZE(5) + 128)> doc;
+  deserializeJson(doc, options[OPTION_MQTT].sval);
+  MqttStruct mqtt_config;
+
+  // strcpy(mqtt_config.domain, doc["dmin"]);
+  mqtt_config.domain = doc["dmin"].as<String>();
+  mqtt_config.port = doc["port"];
+  mqtt_config.topic = doc["topic"].as<String>();
+  mqtt_config.username = doc["name"].as<String>();
+  mqtt_config.password = doc["pass"].as<String>();
+  return mqtt_config;
+}
+
+IFTTTStruct OpenGarage::get_ifttt_config() {
+  StaticJsonDocument<(JSON_OBJECT_SIZE(2) + 64)> doc;
+  deserializeJson(doc, options[OPTION_IFTT].sval);
+  IFTTTStruct ifttt_config;
+
+  ifttt_config.token = doc["token"].as<String>();
+  ifttt_config.trigger = doc["trigger"].as<String>();
+  return ifttt_config;
 }
 
 uint OpenGarage::read_distance() {
