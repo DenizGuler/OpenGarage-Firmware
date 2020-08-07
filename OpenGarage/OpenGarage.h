@@ -30,6 +30,7 @@
 #include <DHTesp.h>
 #include <AM2320.h>
 #include <DallasTemperature.h>
+#include <ArduinoJson.h>
 
 #include "defines.h"
 
@@ -38,6 +39,19 @@ struct OptionStruct {
   uint ival;
   uint max;
   String sval;
+};
+
+struct MqttStruct {
+  String domain;
+  uint port;
+  String username;
+  String password;
+  String topic;
+};
+
+struct IFTTTStruct {
+  String token;
+  String trigger;
 };
 
 struct LogStruct {
@@ -49,6 +63,8 @@ struct LogStruct {
 class OpenGarage {
 public:
   static OptionStruct options[];
+  // static MqttStruct mqtt_config;
+  // static IFTTTStruct ifttt_config;
   static byte state;
   static byte alarm;
   static byte led_reverse;
@@ -58,6 +74,10 @@ public:
   static void options_load();
   static void options_save();
   static void options_reset();
+
+  static MqttStruct get_mqtt_config();
+  static IFTTTStruct get_ifttt_config();
+
   static void restart() { ESP.restart();} //digitalWrite(PIN_RESET, LOW); }
   static uint read_distance(); // centimeter
   static void init_sensors(); // initialize all sensor

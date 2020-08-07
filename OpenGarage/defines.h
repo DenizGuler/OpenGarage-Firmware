@@ -24,7 +24,7 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OG_FWV    111   // Firmware version: 111 means 1.1.1
+#define OG_FWV    121   // Firmware version: 111 means 1.1.1
 
 /** GPIO pins */
 #define PIN_RELAY  15 //D8 on nodemcu
@@ -45,6 +45,10 @@
 #define CONFIG_FNAME    "/config.dat"
 // Log file name
 #define LOG_FNAME       "/log.dat"
+
+// store nested objects as strings
+#define DEFAULT_MQTT_JSON     R"({"dmin": "-.-.-.-", "port": 1883, "name": "", "pass": "", "topic": "opengarage"})"
+#define DEFAULT_IFTTT_JSON    R"({"token": "", "trigger":"opengarage"})"
 
 #define OG_MNT_CEILING  0x00
 #define OG_MNT_SIDE     0x01
