@@ -41,6 +41,12 @@ struct OptionStruct {
   String sval;
 };
 
+struct OTFStruct {
+  String domain;
+  uint port;
+  String token;
+};
+
 struct MqttStruct {
   String domain;
   uint port;
@@ -75,6 +81,7 @@ public:
   static void options_save();
   static void options_reset();
 
+  static OTFStruct get_otf_config();
   static MqttStruct get_mqtt_config();
   static IFTTTStruct get_ifttt_config();
 

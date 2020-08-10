@@ -24,8 +24,7 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OG_FWV    121   // Firmware version: 111 means 1.1.1
-
+#define OG_FWV    122   // Firmware version: 122 means 1.2.2
 /** GPIO pins */
 #define PIN_RELAY  15 //D8 on nodemcu
 #define PIN_BUTTON  0
@@ -49,6 +48,7 @@
 // store nested objects as strings
 #define DEFAULT_MQTT_JSON     R"({"dmin": "-.-.-.-", "port": 1883, "name": "", "pass": "", "topic": "opengarage"})"
 #define DEFAULT_IFTTT_JSON    R"({"token": "", "trigger":"opengarage"})"
+#define DEFUALT_OTF_JSON      R"({"dmin": "ws.test.openthings.io", "port": 80, "token": ""})"
 
 #define OG_MNT_CEILING  0x00
 #define OG_MNT_SIDE     0x01
@@ -85,18 +85,6 @@
 #define OG_STATE_TRY_CONNECT    3
 #define OG_STATE_WAIT_RESTART   4
 #define OG_STATE_RESET          9
-
-#define BLYNK_PIN_DOOR  V0
-#define BLYNK_PIN_RELAY V1
-#define BLYNK_PIN_LCD   V2
-#define BLYNK_PIN_DIST  V3
-#define BLYNK_PIN_CAR   V4
-#define BLYNK_PIN_IP    V5
-#define BLYNK_PIN_JC    V6
-#define BLYNK_PIN_CC    V7
-#define BLYNK_PIN_JO    V8
-#define BLYNK_PIN_CO    V9
-#define BLYNK_PIN_JL    V10
 
 enum {
   DIRTY_BIT_JC = 0,
@@ -139,13 +127,11 @@ typedef enum {
   OPTION_USI,     // use static IP
   OPTION_SSID,    // wifi ssid
   OPTION_PASS,    // wifi password
-  OPTION_AUTH,    // Blynk authentication token
-  OPTION_BDMN,    // Blynk Domain
-  OPTION_BPRT,    // Blynk Port
+  OPTION_OTF,     // OTF stringified JSON
   OPTION_DKEY,    // device key
   OPTION_NAME,    // device name
-  OPTION_IFTT,    // IFTTT token
-  OPTION_MQTT,    // MQTT IP
+  OPTION_IFTT,    // IFTTT stringified JSON
+  OPTION_MQTT,    // MQTT stringified JSON
   OPTION_DVIP,    // device IP
   OPTION_GWIP,    // gateway IP
   OPTION_SUBN,    // subnet
@@ -165,10 +151,8 @@ typedef enum {
 
 #define TIME_SYNC_TIMEOUT  1800 //Issues connecting to MQTT can throw off the time function, sync more often
 
-#define TMP_BUFFER_SIZE 100
-
 /** Serial debug functions */
-//#define SERIAL_DEBUG
+#define SERIAL_DEBUG
 #define DEBUG_BEGIN(x)   { Serial.begin(x); }
 
 #if defined(SERIAL_DEBUG)

@@ -30,12 +30,18 @@ UPLOAD_PORT ?= $(shell ls -1tr /dev/tty*USB* 2>/dev/null | tail -1)
 UPLOAD_PORT := $(if $(UPLOAD_PORT),$(UPLOAD_PORT),/dev/ttyS0)
 
 # OTA parameters
-ESP_ADDR ?= ESP_123456
-ESP_PORT ?= 8266
-ESP_PWD ?= 123
+OTA_ADDR ?=
+OTA_PORT ?= $(if $(filter $(CHIP), esp32),3232,8266)
+OTA_PWD ?=
+
+OTA_ARGS = --progress --ip="$(OTA_ADDR)" --port="$(OTA_PORT)"
+
+ifneq ($(OTA_PWD),)
+  OTA_ARGS += --auth="$(OTA_PWD)"
+endif
 
 # HTTP update parameters
-HTTP_ADDR ?= ESP_123456
+HTTP_ADDR ?=
 HTTP_URI ?= /update
 HTTP_PWD ?= user
 HTTP_USR ?= password
@@ -154,7 +160,7 @@ DEP_EXT = .d
 ARDUINO_MK = $(BUILD_DIR)/arduino.mk
 
 # Special tool definitions
-OTA_TOOL ?= $(TOOLS_ROOT)/espota.py
+OTA_TOOL ?= python $(TOOLS_ROOT)/espota.py
 HTTP_TOOL ?= curl
 
 # Core source files
@@ -183,7 +189,6 @@ ifeq ($(LIBS),)
       LIBS += $(EX_LIB)
     endif
   endif
-
 endif
 
 IGNORE_PATTERN := $(foreach dir,$(EXCLUDE_DIRS),$(dir)/%)
@@ -303,9 +308,18 @@ upload flash: all
 	$(UPLOAD_COM)
 
 ota: all
-	$(OTA_TOOL) -r -i $(ESP_ADDR) -p $(ESP_PORT) -a $(ESP_PWD) -f $(MAIN_EXE)
+ifeq ($(OTA_ADDR),)
+	echo == Error: Address of device must be specified via OTA_ADDR
+	exit 1
+endif
+	$(OTA_PRE_COM)
+	$(OTA_TOOL) $(OTA_ARGS) --file="$(MAIN_EXE)"
 
 http: all
+ifeq ($(HTTP_ADDR),)
+	echo == Error: Address of device must be specified via HTTP_ADDR
+	exit 1
+endif
 	$(HTTP_TOOL) --verbose -F image=@$(MAIN_EXE) --user $(HTTP_USR):$(HTTP_PWD) http://$(HTTP_ADDR)$(HTTP_URI)
 	echo "\n"
 
@@ -319,7 +333,11 @@ upload_fs flash_fs: $(FS_IMAGE)
 	$(FS_UPLOAD_COM)
 
 ota_fs: $(FS_IMAGE)
-	$(OTA_TOOL) -r -i $(ESP_ADDR) -p $(ESP_PORT) -a $(ESP_PWD) -s -f $(FS_IMAGE)
+ifeq ($(OTA_ADDR),)
+	echo == Error: Address of device must be specified via OTA_ADDR
+	exit 1
+endif
+	$(OTA_TOOL) $(OTA_ARGS) --spiffs --file="$(FS_IMAGE)"
 
 run: flash
 	python -m serial.tools.miniterm --rts=0 --dtr=0 $(UPLOAD_PORT) 115200
@@ -358,7 +376,7 @@ clean:
 
 list_boards:
 	echo === Available boards ===
-	cat $(ESP_ROOT)/boards.txt | perl -e 'while (<>) { if (/^(\w+)\.name=(.+)/){ print sprintf("%-20s %s\n", $$1,$$2);} }'
+	cat $(ESP_ROOT)/boards.txt | perl -e 'while (<>) { if (/^([\w\-]+)\.name=(.+)/){ print sprintf("%-20s %s\n", $$1,$$2);} }'
 
 list_lib:
 	echo === User specific libraries ===
@@ -384,7 +402,7 @@ help: $(ARDUINO_MK)
 	echo "  flash                Build and and flash the project application"
 	echo "  flash_fs             Build and and flash file system (when applicable)"
 	echo "  ota                  Build and and flash via OTA"
-	echo "                         Params: ESP_ADDR, ESP_PORT and ESP_PWD"
+	echo "                         Params: OTA_ADDR, OTA_PORT and OTA_PWD"
 	echo "  ota_fs               Build and and flash file system via OTA"
 	echo "  http                 Build and and flash via http (curl)"
 	echo "                         Params: HTTP_ADDR, HTTP_URI, HTTP_PWD and HTTP_USR"

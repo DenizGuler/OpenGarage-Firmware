@@ -64,9 +64,7 @@ OptionStruct OpenGarage::options[] = {
   {"usi", 0,             1, ""},
   {"ssid", 0, 0, ""},  // string options have 0 max value
   {"pass", 0, 0, ""},
-  {"auth", 0, 0, ""},
-  {"bdmn", 0, 0, "blynk-cloud.com"},
-  {"bprt", 80,65535, ""},
+  {"otf", 0, 0, DEFUALT_OTF_JSON},
   {"dkey", 0, 0, DEFAULT_DKEY},
   {"name", 0, 0, DEFAULT_NAME},
   {"iftt", 0, 0, DEFAULT_IFTTT_JSON},
@@ -264,12 +262,26 @@ void OpenGarage::options_save() {
   set_dirty_bit(DIRTY_BIT_JO, 1);
 }
 
+OTFStruct OpenGarage::get_otf_config() {
+  StaticJsonDocument<(JSON_OBJECT_SIZE(3) + 128)> doc;
+  DEBUG_PRINT(F("Deserializing OTF JSON: "));
+  DEBUG_PRINTLN(options[OPTION_OTF].sval);
+  deserializeJson(doc, options[OPTION_OTF].sval);
+  OTFStruct otf_config;
+
+  otf_config.domain = doc["dmin"].as<String>();
+  otf_config.port = doc["port"];
+  otf_config.token = doc["token"].as<String>();
+  return otf_config;
+}
+
 MqttStruct OpenGarage::get_mqtt_config() {
   StaticJsonDocument<(JSON_OBJECT_SIZE(5) + 128)> doc;
+  DEBUG_PRINT(F("Deserializing MQTT JSON: "));
+  DEBUG_PRINTLN(options[OPTION_MQTT].sval);
   deserializeJson(doc, options[OPTION_MQTT].sval);
   MqttStruct mqtt_config;
 
-  // strcpy(mqtt_config.domain, doc["dmin"]);
   mqtt_config.domain = doc["dmin"].as<String>();
   mqtt_config.port = doc["port"];
   mqtt_config.topic = doc["topic"].as<String>();
@@ -280,6 +292,8 @@ MqttStruct OpenGarage::get_mqtt_config() {
 
 IFTTTStruct OpenGarage::get_ifttt_config() {
   StaticJsonDocument<(JSON_OBJECT_SIZE(2) + 64)> doc;
+  DEBUG_PRINT(F("Deserializing IFTTT JSON: "));
+  DEBUG_PRINTLN(options[OPTION_IFTT].sval);
   deserializeJson(doc, options[OPTION_IFTT].sval);
   IFTTTStruct ifttt_config;
 
@@ -375,7 +389,8 @@ void OpenGarage::read_TH_sensor(float& C, float& H) {
 }
 
 bool OpenGarage::get_cloud_access_en() {
-  if(options[OPTION_AUTH].sval.length()==32) {
+  OTFStruct otf_config = get_otf_config();
+  if(otf_config.token.length()) {
     return true;
   }
   return false;
@@ -454,9 +469,9 @@ void OpenGarage::config_ip() {
   if(options[OPTION_USI].ival) {
     IPAddress dvip, gwip, subn, dns1;
     if(dvip.fromString(options[OPTION_DVIP].sval) &&
-       gwip.fromString(options[OPTION_GWIP].sval) &&
-       subn.fromString(options[OPTION_SUBN].sval) &&
-       dns1.fromString(options[OPTION_DNS1].sval)) {
+      gwip.fromString(options[OPTION_GWIP].sval) &&
+      subn.fromString(options[OPTION_SUBN].sval) &&
+      dns1.fromString(options[OPTION_DNS1].sval)) {
       WiFi.config(dvip, gwip, subn, dns1, gwip);
     }
   }

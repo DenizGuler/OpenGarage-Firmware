@@ -6,16 +6,19 @@ $(ESP_LIBS)/DNSServer \
 $(ESP_LIBS)/ESP8266WebServer \
 $(ESP_LIBS)/ESP8266HTTPClient \
 $(ESP_LIBS)/Ticker \
-~/Arduino/libraries/Blynk \
+$(ESP_LIBS)/Hash \
 ~/Arduino/libraries/PubSubClient/src \
 ~/Arduino/libraries/AM2320 \
 ~/Arduino/libraries/OneWire \
 ~/Arduino/libraries/DHTsensor \
 ~/Arduino/libraries/DallasTemperature \
 ~/Arduino/libraries/ArduinoJson/src \
+~/Arduino/libraries/OTF-Controller-Library \
+~/Arduino/libraries/arduinoWebSockets \
 .
 
-ESP_ROOT = $(HOME)/Arduino/hardware/esp8266com/esp8266
+# ESP_ROOT = $(HOME)/Arduino/hardware/esp8266com/esp8266
+ESP_ROOT = $(HOME)/esp8266_latest
 BUILD_ROOT = /tmp/$(MAIN_NAME)
 
 #UPLOAD_SPEED = 921600

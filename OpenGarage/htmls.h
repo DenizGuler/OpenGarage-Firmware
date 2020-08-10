@@ -15,7 +15,7 @@ table#rd td {	border: 1px solid black; border-collapse: collapse;}</style>
 <table cellspacing=16>
 <tr><td><input type='text' name='ssid' id='ssid' style='font-size:14pt;height:28px;'></td><td>(Your WiFi SSID)</td></tr>
 <tr><td><input type='password' name='pass' id='pass' style='font-size:14pt;height:28px;'></td><td>(Your WiFi Password)</td></tr>
-<tr><td><input type='text' name='auth' id='auth' style='font-size:14pt;height:28px;'></td><td><label id='lbl_auth'>(Blynk Token, Optional)</label></td></tr>
+<tr><td><input type='text' name='auth' id='auth' style='font-size:14pt;height:28px;'></td><td><label id='lbl_auth'>(OTC Token, Optional)</label></td></tr>
 <tr><td colspan=2><p id='msg'></p></td></tr>
 <tr><td><button type='button' id='butt' onclick='sf();' style='height:36px;width:180px'>Submit</button></td><td></td></tr>
 </table>
@@ -122,7 +122,7 @@ show_msg('Update failed.',0,'red');
 }
 }
 };
-xhr.open('POST', 'update', true);
+xhr.open('POST', '//' + window.location.hostname + ':8080' + window.location.pathname, true);
 xhr.send(fd);
 });
 </script>
@@ -140,6 +140,7 @@ const char sta_home_html[] PROGMEM = R"(<head><title>OpenGarage</title><meta nam
 <tr><td><b>Distance:</b></td><td><label id='lbl_dist'>-</label></td><td></td></tr>
 <tr><td><b>Read&nbsp;Count:</b></td><td><label id='lbl_beat'>-</label></td><td></td></tr>
 <tr><td><b>WiFi&nbsp;Signal:</b></td><td colspan='2'><label id='lbl_rssi'>-</label></td></tr>
+<tr><td><b>OTC Status:</b></td><td colspan='2'><label id='lbl_otcs'>-</label></td></tr>
 <tr id='tbl_th' style='display:none;'><td><b>T/H sensor:</b></td><td colspan='2'><label id='lbl_th'>-</label></td></tr>
 <tr><td><b>Device&nbsp;Key:</b></td><td colspan='2' ><input type='password' size=20 maxlength=32 name='dkey' id='dkey'></td></tr>
 <tr><td colspan=3><label id='msg'></label></td></tr>
@@ -239,6 +240,7 @@ $('#pic').attr('src', jd.door?'https://github.com/OpenGarage/OpenGarage-Firmware
 }
 $('#lbl_beat').text(jd.rcnt);
 $('#lbl_rssi').text((jd.rssi>-71?'Good':(jd.rssi>-81?'Weak':'Poor')) +' ('+ jd.rssi +' dBm)');
+$('#lbl_otcs').text(["Not enabled","Unable to connect","Disconnected","Connected"][jd.otcs]+" since "+new Date(jd.otcc*1000));
 $('#head_name').text(jd.name);
 $('#btn_click').html(jd.door?'Close Door':'Open Door').button('refresh');
 if(typeof(jd.temp)!='undefined') {$('#tbl_th').show(); $('#lbl_th').text(jd.temp.toFixed(1)+String.fromCharCode(176)+'C / '+(jd.temp*1.8+32).toFixed(1)+String.fromCharCode(176)+'F (H:'+jd.humid.toFixed(1)+'%)');}
@@ -361,9 +363,9 @@ const char sta_options_html[] PROGMEM = R"(<head><title>OpenGarage</title><meta 
 </div>
 <div id='div_cloud' style='display:none;'>
 <table cellpadding=1>
-<tr><td><b>Blynk Token:</b></td><td><input type='text' size=20 maxlength=32 id='auth' data-mini='true' value='-'></td></tr>
-<tr><td><b>Blynk Domain:</b></td><td><input type='text' size=20 maxlength=32 id='bdmn' data-mini='true' value='-'></td></tr>
-<tr><td><b>Blynk Port:</b></td><td><input type='text' size=5 maxlength=5 id='bprt' data-mini='true' value=0></td></tr>
+<tr><td><b>OTC Token:</b></td><td><input type='text' size=20 maxlength=32 id='auth' data-mini='true' value='-'></td></tr>
+<tr><td><b>OTC Domain:</b></td><td><input type='text' size=20 maxlength=32 id='bdmn' data-mini='true' value='-'></td></tr>
+<tr><td><b>OTC Port:</b></td><td><input type='text' size=5 maxlength=5 id='bprt' data-mini='true' value=0></td></tr>
 <tr><td><b>IFTTT Key:</b></td><td><input type='text' size=20 maxlength=64 id='iftt' data-mini='true' value='-'></td></tr>
 <tr><td><b>MQTT Server:</b></td><td><input type='text' size=16 maxlength=20 id='mqtt' data-mini='true' value=''></td></tr>
 </table>
@@ -550,7 +552,7 @@ const char sta_update_html[] PROGMEM = R"(<head>
 <div data-role='page' id='page_update'>
 <div data-role='header'><h3>OpenGarage Firmware Update</h3></div>
 <div data-role='content'>
-<form method='POST' action='/update' id='fm' enctype='multipart/form-data'>
+<form method='POST' action='' id='fm' enctype='multipart/form-data'>
 <table cellspacing=4>
 <tr><td><input type='file' name='file' accept='.bin' id='file'></td></tr>
 <tr><td><b>Device key: </b><input type='password' name='dkey' size=16 maxlength=16 id='dkey'></td></tr>
@@ -600,7 +602,7 @@ show_msg('Update failed.',0,'red');
 }
 }
 };
-xhr.open('POST', 'update', true);
+xhr.open('POST', '//' + window.location.hostname + ':8080' + window.location.pathname, true);
 xhr.send(fd);
 });
 </script>
