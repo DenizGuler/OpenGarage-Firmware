@@ -18,12 +18,14 @@ For Firmware release notes, go to [https://github.com/OpenGarage/OpenGarage-Firm
 * OneWire library: https://www.pjrc.com/teensy/td_libs_OneWire.html
 * DallasTemperature library: https://github.com/milesburton/Arduino-Temperature-Control-Library/releases
 * DHTesp library: https://github.com/beegee-tokyo/DHTesp/releases
+* OTF-Firmware-Library: https://github.com/openthingsio/OTF-Firmware-Library
+* WebSocket Server and Client for Arduino: https://github.com/Links2004/arduinoWebSockets
 
 * This (OpenGarage) library
 
 #### Setting up a Dev Environment
 
-* Install Arduino with ESP8266 core 2.4.1 (or use make directly, following https://github.com/plerup/makeEspArduino).
+* Install Arduino with ESP8266 core 2.7.4 (or use make directly, following https://github.com/plerup/makeEspArduino).
 * Install Arduino libraries referenced above.
 * Download this repository and extract the OpenGarage library to your Arduino's `libraries` folder.
 
